@@ -24,3 +24,11 @@ python aup2rpp.py myProject.aup
 ```
 
 which will save the reaper file and audio dependencies in the same directory as your .aup file.
+
+
+
+TO DO
+------
+* 32 bit float support
+  * pass through for all .AU files. .AU is a container format for PCM audio data. There's no reason to be converting it and stuff.
+* IF conversion supported still - add audio dithering.
