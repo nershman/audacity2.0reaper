@@ -7,10 +7,35 @@ import os
 import html
 import argparse
 
+"""
+shermnotes
 
+.AU : A container format, used by Audacity for storage of lossless, uncompressed, 
+PCM audio data. Not be confused with Sun/NeXT AU files, which are usually U-Law 
+encoded PCM files but may be headerless. 
+
+https://forum.audacityteam.org/viewtopic.php?t=73428
+
+if converting to 16 bit then one should use dithering.
+
+"""
+
+
+#TODO: stop duplicating sound files
+
+#TODO: allow choice between 16 bit and 32 float
+
+#TODO: auto save files only to 32 bit when the filehas peaks above 0db.
 AU_SAMPLE_FORMAT_16 = 3
 AU_SAMPLE_FORMAT_24 = 4
 AU_SAMPLE_FORMAT_FLOAT = 6
+
+IEEE_FLOAT = 3
+PCM = 1
+
+convert_to_16 = False
+
+conversion_dict = {AU_SAMPLE_FORMAT_16:16, AU_SAMPLE_FORMAT_24:24, AU_SAMPLE_FORMAT_FLOAT:32}
 
 
 def load_au_file(au_fpath):
@@ -88,6 +113,7 @@ def load_au_file(au_fpath):
 
 class WavWriter:
 	def __init__(self, f, sample_rate, channels, bits_per_sample):
+		#WavWriter(f, au['sample_rate'], nchannels, 16 OR 32)
 		self.f = f
 		self.sample_rate = sample_rate
 		self.channels = channels
@@ -99,6 +125,11 @@ class WavWriter:
 		self.fmt_chunk_size = 2 + 2 + 4 + 4 + 2 + 2
 
 		self.initial_fpos = f.tell()
+
+		if self.bits_per_sample == 32:
+			self.type_of_format = IEEE_FLOAT
+		else:
+			self.type_of_format = PCM
 
 		# Leave blank header size, we'll write it once all audio has been written.
 		# Go straight to the offset where we will write samples
@@ -156,15 +187,16 @@ class WavWriter:
 		
 		sfc = 'h'
 		if self.bits_per_sample == 32:
-			sfc = 'i'
-
+			sfc = 'f'
+ 
 		f = self.f
+		#print(self.bits_per_sample) #DEBUG
 		for v in sample_data:
 			f.write(struct.pack(sfc, v))
 
 		self.samples_count += nsamples
 
-	def finalize(self):
+	def finalize(self): #sherman note: I think this is where the header is actually written.
 		assert not self.finalized
 		f = self.f
 
@@ -190,7 +222,8 @@ class WavWriter:
 
 		# Format
 		# PCM = 1 (i.e. Linear quantization) Values other than 1 indicate some form of compression.
-		f.write(struct.pack('H', 1))
+		# IEEE float = 3
+		f.write(struct.pack('H', self.type_of_format))
 
 		f.write(struct.pack('H', self.channels))
 
@@ -254,7 +287,7 @@ def convert_au_files_to_wav(src_paths_by_channel, dst_path):
 					continue
 
 				au = load_au_file(src_paths[block_index])
-				samples = au['sample_data']
+				samples = au['sample_data'] #load samples
 
 				if au['channels'] != 1:
 					# TODO Deal with this eventually...
@@ -264,30 +297,41 @@ def convert_au_files_to_wav(src_paths_by_channel, dst_path):
 					return 0
 
 				# Make sure it ends up in the encoding we want
-				if au['encoding'] == AU_SAMPLE_FORMAT_FLOAT:
+				print(au['encoding'])
+				if convert_to_16 and au['encoding'] == AU_SAMPLE_FORMAT_FLOAT: #converts 32-bit float to 16-bit PCM.
 					for i, v in enumerate(samples):
-						# We want 16-bit PCM
+						# We want 16-bit PCM #####no.... we dont bro!
 						samples[i] = int(v * 32767.0)
+						#clipping.
+						samples[i] = min(samples[i], 32767) #too high
+						samples[i] = max(samples[i], -32767) #too low
 				elif au['encoding'] == AU_SAMPLE_FORMAT_24:
 					print("ERROR: 24 bits not supported")
 					return
 				elif au['encoding'] == AU_SAMPLE_FORMAT_16:
 					pass # Already OK
+				elif not convert_to_16:
+					pass
 				else:
 					print("ERROR: Unknown .au encoding: ", au['encoding'])
-					return 0
+					return 0 #this return 0 breaks it on purpose
+					#FIXME set up proper if else hierarchy
 
+				if convert_to_16 and w is None:
+					w = WavWriter(f, au['sample_rate'], nchannels, 16) #no error here but still.
+
+				#output at same sample rate as AU
 				if w is None:
-					w = WavWriter(f, au['sample_rate'], nchannels, 16)
+					w = WavWriter(f, au['sample_rate'], nchannels, conversion_dict[au['encoding']]) #TODO: DEBUG does this work lol?
 
 				elif w.sample_rate != au['sample_rate']:
 					print("ERROR: sample rate differs in one of the .au files I wanted to concatenate into one .wav")
 					# TODO Resample, or return multiple files and split the clip...
 					break
 
-				samples_by_channel.append(samples)
+				samples_by_channel.append(samples) #add to list of list of samples.
 
-			w.append_multichannel_samples(samples_by_channel)
+			w.append_multichannel_samples(samples_by_channel) #Error here due to not writing to 32bit instead
 
 		w.finalize()
 
@@ -433,7 +477,7 @@ def convert_au_files_from_audacity_project(project, target_dir):
 
 	tracks = project['tracks']
 
-	# TODO Eventually just make an entirely new project dictionary rather than modifying the input one
+	#TODO Eventually just make an entirely new project dictionary rather than modifying the input one
 	converted_tracks = []
 	project['converted_tracks'] = converted_tracks
 
@@ -657,7 +701,7 @@ def write_rpp_file_from_audacity_project(fpath, project):
 	with open(fpath, 'w', encoding="utf-8") as f:
 		w = RppWriter(f)
 
-		# Arbitrary version, which happens to be mine at time of writing.
+		# Arbitrary version, which happens to be mine at time of writing. #3 years old, but we'll keep it to not break things...
 		# TODO I don't know what the number at the end is
 		w.open_block('REAPER_PROJECT', 0.1, '5.92/x64', 1534982487)
 
@@ -717,6 +761,7 @@ def write_rpp_file_from_audacity_project(fpath, project):
 				#   >
 				# >
 
+				#NOTE: would it be possible to create a reaper file which just links to AU files? much faster..
 				w.close_block()
 
 			w.close_block()
@@ -749,4 +794,3 @@ if __name__ == '__main__':
 	args = parser.parse_args()
 
 	convert(args.audacity_project)
-
