@@ -10,33 +10,43 @@ It uses Python 3.6 and has no external dependencies.
 
 Why
 ----
+With this you can easily convert your old audacity projects to reaper projects if you've made the switch. You can also use it to accomodate workflows which involve preliminary recording/experimentation in Audacity and more serious mixing in Reaper.
 
-- I'm primarily doing this for fun, as I realized both softwares used fairly simple formats to store their data
-- Easily transfer old Audacity projects to Reaper. 
+What is preserved?
+---------
+Basically anything that you can do in an audacity project, can be ported to a Reaper project.
+* track order
+* audio locations
+* track color codes
+* panning
+* mute/solo
+* mixing gain
+* volume automation
+* comment markers (?)
+
+Some edge cases which could be looked into:
+* misaligned left/right channels set as one track
+* small slices of audio cut from a larger piece such that all pieces reference the same .au file.
 
 
 How to use
 ----------
-
-You need to install Python 3.6 or later. Then you can use it from the command line, for example:
-```
-python aup2rpp.py myProject.aup
-```
-
-which will save the reaper file and audio dependencies in the same directory as your .aup file.
+With python 3.6 or later, run from command line: `python aup2rpp.py myProject.aup` and a .rpp file and audio folder will be saved to the same directory as your audacity project file, with names based off audacity's. Audacity project and files are not deleted, don't worry.
 
 
-Sherman's modifications
+My fork
 ------
+The original project seems to be abandoned so I won't bother making pull requests. So far I've added the following features.
+
 * Defaults all audio files to 32-bit float to avoid clipping issues.
 * Avoids duplicate audio files when a sample is repeated.
 
 TODO
 -----
-* dithering if upsampled
 * drop silences
-* accomodate misaligned left-right channels (audacity allows left and right tracks to be misaligned, yes)
+* accomodate misaligned left-right channels
 * force 16 bit option
 * force 32 bit option
 * noclip option
 * specify output file and output folder.
+* dithering when downsampled
