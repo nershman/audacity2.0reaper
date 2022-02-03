@@ -12,7 +12,7 @@ Why
 ----
 
 - I'm primarily doing this for fun, as I realized both softwares used fairly simple formats to store their data
-- It might be useful for people wanting to switch to Reaper. Maybe.
+- Easily transfer old Audacity projects to Reaper. 
 
 
 How to use
@@ -26,9 +26,17 @@ python aup2rpp.py myProject.aup
 which will save the reaper file and audio dependencies in the same directory as your .aup file.
 
 
-
-TO DO
+Sherman's modifications
 ------
-* 32 bit float support
-  * pass through for all .AU files. .AU is a container format for PCM audio data. There's no reason to be converting it and stuff.
-* IF conversion supported still - add audio dithering.
+* Defaults all audio files to 32-bit float to avoid clipping issues.
+* Avoids duplicate audio files when a sample is repeated.
+
+TODO
+-----
+* dithering if upsampled
+* drop silences
+* accomodate misaligned left-right channels (audacity allows left and right tracks to be misaligned, yes)
+* force 16 bit option
+* force 32 bit option
+* noclip option
+* specify output file and output folder.
